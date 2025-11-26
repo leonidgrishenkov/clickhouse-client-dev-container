@@ -1,37 +1,39 @@
-# debian:trixie-20251103
-FROM docker.io/debian@sha256:01a723bf5bfb21b9dda0c9a33e0538106e4d02cce8f557e118dd61259553d598
+# debian:stable-20251117-slim
+FROM docker.io/debian@sha256:7cb087f19bcc175b96fbe4c2aef42ed00733a659581a80f6ebccfd8fe3185a3d
 
-SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 USER root
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends sudo curl git ca-certificates locales gpg \
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update -q \
+    && apt-get install -y --no-install-recommends -q sudo=1.9.* \
+    curl=8.14.* \
+    gnupg=2.4.* \
+    wget=1.25.* \
+    locales=2.4* \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 RUN localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
 
-ENV LANG en_US.UTF-8
-ENV TZ UTC
+ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8 TZ=UTC
 
-# TODO: what is actually apt-transport-https ?
-# BUG: не получается к клику из контейнера приокннектится
-RUN apt-get install -y apt-transport-https \ 
-    && curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | gpg --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg \
-    && ARCH=$(dpkg --print-architecture) \
-    && echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg arch=${ARCH}] https://packages.clickhouse.com/deb stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list \
-    && apt-get update \
-    && apt-get install -y clickhouse-client
+COPY --chown=root:root --chmod=700 ./install-ch.sh /tmp/install-ch.sh
 
-RUN groupadd -g 1000 devs \
-    && useradd -m -u 1000 -G sudo,devs -s /bin/bash dev \
-    && echo "dev ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/dev \
-    && chmod 0440 /etc/sudoers.d/dev
+RUN /tmp/install-ch.sh \
+    rm /tmp/install-ch.sh \
+    clickhouse-client --version
 
-USER dev
-ENV HOME /home/dev
+RUN useradd -m -u 1000 -G sudo -s /bin/bash chuser \
+    && echo "chuser ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/chuser \
+    && chmod 0440 /etc/sudoers.d/chuser
 
-USER dev
-WORKDIR /home/dev
-ENV TERM xterm-256color
+USER chuser
+ENV HOME=/home/chuser TERM=xterm-256color
 
-SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
+SHELL ["/bin/bash", "-c"]
+
+WORKDIR $HOME
+
+CMD ["tail", "-f", "/dev/null"]
