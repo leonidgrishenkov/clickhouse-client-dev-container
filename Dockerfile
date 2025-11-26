@@ -23,7 +23,7 @@ COPY --chown=root:root --chmod=700 ./install-ch.sh /tmp/install-ch.sh
 
 RUN /tmp/install-ch.sh \
     rm /tmp/install-ch.sh \
-    clickhouse-client --version
+    ch --version
 
 RUN useradd -m -u 1000 -G sudo -s /bin/bash chuser \
     && echo "chuser ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/chuser \
